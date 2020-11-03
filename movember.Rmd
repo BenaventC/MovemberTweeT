@@ -1,0 +1,302 @@
+---
+title: "#ConfinementJour56 : a twitter corpus about the french confinement experience"
+author: "SB - MC - CB"
+date: "27 avril 2020"
+output:
+  html_document: default
+---
+[retour au repo](https://github.com/BenaventC/BarometreConfinement)
+
+![Movember]()
+
+
+Ce script concerne la première phase de l'analyse, l'extraction des données réalisée avec le package rtweet et l'API rest de twitter dans sa version open.
+
+L'extraction est dirigée par le choix d'une série  hashtag #confinementjour1 puis 2 et 3, et voué à de longs jours, on suppose qu'il cristalise les intentions de dire et de partager ses états d'âmes. C'est ce canal que nous allons utiliser pour tester la sensibilité des instrument de mesure du sentiment, et espérons mieux comprendre la réaction des populations à un choc  anthropocènique brutal (le choc c'est la rencontre d'une société avancée et mobile, et d'une contingence naturelle : un virus qui circule de souffle en souffle et se déplace à travers la planête en businessclass et conduisant à clouer au sol la quasi totalité des flottes aériennes. 
+
+Ce hashtag est apparu dans les 41 premiers jours en trending topic, s'il ne reflète pas l'ensemble des réactions au phénomène du confinement, juste une écume, il est assez commun et conventionnel pour être digne d'intéret. Une convention est une institution qui s'impose à tous mais qui a des alternatives, et  dont l'origine est inconnue(Favereau). Si l'exemple de la conduite à droite où à gauche est le plus évident, dans notre contexte les hashtag fonctionnent aussi comme des bannières de ralliement, une convention de signalement mais aussi un espace de rassemblement. Leur force conventionnelle peut d'ailleurs s'apprécier par leur stabilité.
+
+Le choix très spécifique de ce hashtag au caractère sériel qui dénote une culture populaire des séries rythmée par des saisons et des épisodes, est justifié par sa signication : le lieu et la bannière de ce que l'on pense, sent et peut être de ce qu'on fait (par définition une expérience) au fil des jours, au rythme quoditien des applaudissements du soir qui suivent le bulletion du DGS. Il permet ainsi de sonder la production de contenus sociaux dans la perspective particulière de l'expérience du confinement, telle qu'on la partage dans les réseaux sociaux. C'est un fil tenu qui nous semble-t-il significatif, moins au sens de la représentation de l'humeur générale que d'une cohérence éditoriale. 
+
+
+On va lancer nos filets de pêche dans ce petit courant, en espérant que ce sera un caillou de plus pour retrouver le chemin d'une humanité en bonne santé. La méthode est de recherché le lendemain ( plutôt dans l'après midi) les twet du jour d'avant. On accumule ainsi progressivement les données.
+
+
+
+## Les outils de l'analyse
+
+Le but de l'exercice est de mesurer le sentiment dans la période covid19 au travers des twits générés avec le hashtag #confinementjourxx qui signale clairement l'intention de donner son sentiment, son humeur, sa pensée, son expérience. 
+
+L'outil principal est [`rtweet`](https://github.com/ropensci/rtweet)
+
+
+```{r setup, include=TRUE, echo=TRUE,message = FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE,include=TRUE, cache=TRUE,  message = FALSE, warning=FALSE)
+library(tidyverse) #l'environnement de base : données et visus
+library(rtweet) #extraction twitter
+library(gridExtra) #associer des ggplots en un graphe
+library(readr)
+library(tidyverse) #l'environnement de base : données et visus
+library(reshape2)
+library(gridExtra) #associer des ggplot
+library(ggrepel) #pour une belle labelisation des xy
+library(igraph) #pour l'analyse de réseau
+library(scales) #pour les échelles de temps et de date
+library(syuzhet)     # ncr      
+library(tm)
+library(quanteda) #with quanteda
+library(kableExtra)
+library(stringi)
+library(scales) #pour les échelles de temps et de date
+library(ineq)
+library(gglorenz)
+library(ggridges)
+library(RcppRoll) #pour des moyennes glissantes
+
+```
+
+## La collecte des données
+
+On utilise l'API de twitter via le package [`rtweet`](https://rtweet.info/articles/intro.html) pour aller chercher les tweets contenant le hashtag "confinementjour$" 
+
+Les limites de l'API free de twitter sont de 15000 requêtes par 15mn, on emploie donc le paramètre `retryonratelimit = TRUE` pour poursuivre la requête en supportant la latence. Celà représente facilement quelques heures de requêtage. On sauvegarde donc rapidement le résultat dans un fichier fixe, qu'on pourra rappeler plus tard pour analyse, avec la fonction `write_rds`.
+
+On commence à capturer les données le 9ème jour, puis chaque jour sur le jour de la veille pour couvrir la rémanence (les tweets #movember publiés à j+1). La convention fixe par sa morphologie un ordre du temps. En principe on capture l'intégralité du flux.
+
+La boucle est opérationnelle si on ajoute, une série de hashtag dans le vecteur x. La procédure doit être relancée chaque jour ( de préférence à une même heure )
+
+
+```{r capt, include=TRUE, eval=FALSE,warning =TRUE, }
+#une boucle pour les differents #
+
+foo<-readRDS(file = "df_consoj9.rds")
+foo<- foo %>% filter(user_id=="1")
+
+x<-c("#Movember2020","#Movember","#movember","movember2020","#moustache","#moustachu","#çapousseToujours","#MovemberFRA","#Movemberfrance", "#movemberfrance","#MOVEMBERFRANCE", "#mosista","MoSista","#mobro","MoBro")
+
+
+for (val in x) {
+  tweets <- search_tweets(val,n=200000,retryonratelimit = TRUE)%>%mutate(hashtag=val, jour=3)
+  foo<-rbind(foo,tweets)
+}
+
+
+df<-foo
+# les fichiers Movember sont les fichiers primaires à archiver
+write_rds(df,"movember03.rds")
+```
+
+La compilation des données est faite à la main, jour par jour.
+
+```{r capt2, eval=FALSE}
+
+
+df00<- readRDS(file = "movember00.rds") 
+df01<-readRDS(file = "movember01.rds")
+df01a<-readRDS(file = "movember01a.rds")
+#df01b<-readRDS(file = "movember01b.rds")
+df02<-readRDS(file = "movember02.rds")
+df03<-readRDS(file = "movember03.rds")
+
+df_total<-rbind(df00,df01, df01a,df02,df03) %>% 
+  select(user_id,status_id,created_at,screen_name,text,quoted_text,quoted_status_id,source,display_text_width,is_quote,is_retweet,favorite_count,retweet_count,quote_count,reply_count, media_type, lang,  country, country_code, name,location, description, place_name,friends_count, followers_count,statuses_count,listed_count, favourites_count, account_created_at, verified,hashtags,mentions_screen_name)
+
+#deduplication sur le satus_id
+
+df_total<-df_total[!duplicated(df_total$status_id), ]
+df_total<-df_total %>% filter(lang=="en")
+#sauvegarde
+write_rds(df_total,"df_total.rds")
+
+#on crée un échantillon de travail
+sample<-readRDS(file="df_total.rds")
+sample<- sample_n(sample,1000)
+write_rds(sample,"df_sample.rds")
+```
+# détection de langue pour filtrer les contenu en français
+
+attention comment faire avec le quebec? et les belges ? et les suisses et l'Afrique ?
+
+
+# L' évolution quantitative des tweets collectés
+
+On retrace ici la production des tweets, rt et comment d"heure en heure ce qui permet de capter les variations quotidiennes. On notera qu'en journée l'échantillon représente plusieurs centaines d'observations à l'heure ce qui assure une grande sensibilité des mesures. On utilise [ts_plot](https://cran.r-project.org/web/packages/TSstudio/vignettes/Plotting_Time_Series.html)
+
+```{r desc2, fig.width=10}
+df<-readRDS(file = "df_total.rds")
+
+## plot time series of tweets
+ts_plot(df, "1 hour", color="darkblue") +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Fréquence des posts twitters sur #Movember2020",
+    subtitle = "Nombre de tweets par heure",
+    caption = "\nSource: Data collected by #laboratoireduConfinement from Twitter's REST API via rtweet"
+  )+  scale_x_datetime(date_breaks = "1 day", labels = scales::label_date_short())
+```
+
+ en distinguant tweets et rt.
+ 
+```{r desc3, fig.width=10}
+df %>%
+  dplyr::group_by(is_retweet) %>%
+  ts_plot( "1 hours") +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold")) +
+  ggplot2::labs(
+    x = NULL, y = NULL,
+    title = "Fréquence des posts twitters sur #Movember2020",
+    subtitle = "Nombre de tweets par  heures",
+    caption = "\nSource: Data collected by #laboratoireduConfinement from Twitter's REST API via rtweet"
+  )+  scale_x_datetime(date_breaks = "1 day", labels = scales::label_date_short())
+```
+
+Ce qui conduit à examiner l'évolution du ratio tweet /retweet au cours du temps. On s'aperçoit que variation forte et ponctuelle, d'un rapport de base de 1 à 5 sont passse à des extrêmes de 1 à 10. Sans doute, mais c'est à vérifier, la conséquence de nouvelles marquantes.
+
+```{r desc1, fig.width=10}
+df$day<-as.numeric(format(df$created_at, "%d")) # jour
+#ggplot(df,aes(x=day))+geom_bar()+theme_minimal()
+df$month<-as.numeric(format(df$created_at, "%m")) # mois
+df$hour<-as.numeric(format(df$created_at, "%H")) # heure
+#ggplot(df,aes(x=hour))+geom_bar()+theme_minimal()
+df$year<-2020 # heure
+df$day2<-as.factor(df$day)
+
+foo<-df %>% group_by(month,day,hour) %>% mutate(n_rt=ifelse(is_retweet==TRUE,1,0),n_tw=ifelse(is_retweet==TRUE,0,1)) %>%summarise(n_rt=sum(n_rt),n_tw=sum(n_tw)) %>% mutate(rtrt=n_rt/n_tw)
+foo$date<-paste0("2020","-",foo$month,"-",foo$day," ",foo$hour,":00:00")
+foo$date2 <- as.POSIXct(strptime(foo$date, "%Y-%m-%d %H:%M:%S"))
+
+ggplot(foo,aes(x = date2,y=rtrt))+geom_line(color="firebrick")+theme_minimal()+labs(
+    x = "Jours", y = "Ratio rt/tweet ( à l'heure)",
+    title = " Evolution du ratio twit/retwet  sur #confinementjour",
+    caption = "\nSource: Data collected by #laboratoireduConfinement from Twitter's REST API via rtweet")+  scale_x_datetime(date_breaks = "1 day", labels = scales::label_date_short()) #+scale_y_log10()
+
+```
+
+# Annotations
+
+L'analyse du sentiment peut se faire avec plusieurs outils, on en retient pour l'instant trois, auxquels d'autres devraient être ajoutés (emoji, )
+
+ * le NCR avec le package [syuzhet](https://cran.r-project.org/web/packages/syuzhet/vignettes/syuzhet-vignette.html)  On complète avec les émotions. 
+ * le #Liwc via quanteda et le dictionnaire en français.
+ * le lsdfr
+
+
+
+## Méthode NRC
+
+On utilise le package [`syuzhet`]'(https://cran.r-project.org/web/packages/syuzhet/vignettes/syuzhet-vignette.html). La procédure est simple. On enrichit le fichier de données df de ces nouvelles annotations
+
+https://cran.r-project.org/web/packages/syuzhet/vignettes/syuzhet-vignette.html
+
+Il donne un comptage des termes positifs et négatifs, mais aussi une gamme de 8 émotions. 
+
+```{r Senti01b, eval = TRUE}
+#require(syuzhet)            
+#prend bcp de temps 
+#paramétres
+phrase<-as.character(df$text)
+
+#extraction
+#my_text_values_french1<- get_nrc_sentiment(phrase, language="english")
+
+#ajout de la colonne sentiment au tableau de données général:
+sent<-as.data.frame(my_text_values_french1)
+#extrait du fichier
+kable(head(sent,5))
+
+#ajout
+df<-cbind(df,sent)
+
+#on sauvegarde pour réemploi ultérieur
+write_rds(df,"df_nrc.rds")
+library(parallel)
+
+cl <- makeCluster(3)
+clusterExport(cl = cl, c("get_sentiment", "get_sent_values", "get_nrc_sentiment", "get_nrc_values", "parLapply"))
+df_par <- get_sentiment(phrase, cl=cl)
+df_nrc_par <- get_sentiment(phrase, method='nrc', cl=cl)
+stopCluster(cl)
+
+
+
+```
+
+Il y a une solution de parallélisation
+
+Une amélioration possible est la lemmatisation préalable du corpus qui devrait présenter un taux de reconnaissance plus élevé. C'est à tester de manière systématique
+
+
+## Methode liwc
+
+le LIWC dont il existe [deux versions 2007 et 2015](https://liwc.wpengine.com/compare-dictionaries/) permet d’obtenir d’autres indicateurs du sentiment, même s'il propose son propre calcul de positivité et de negativité qu'on va explité ne serait-ce que pour étblir la convergence avec l'indicateur NRC.
+
+Une partie des 80 indicateurs proposés est relatif à des dimensions topicales dont plusieurs groupes vont retenir notre attention dans la mesure où ils décrivent une partie de l’expérience relatée dans les commentaires. On retrouvera ici les [principales variables](https://www.kovcomp.co.uk/wordstat/LIWC.html) traduction en français voir ref
+
+La procédure pour extraire ces notions est fort simple, analogue à la précédente : on installe le dictionnaire LIWC et on utilise quanteda pour executer l'opération (`liwcalike`)
+
+```{r liwc01, eval = TRUE}
+# the devtools package needs to be installed for this to work
+#devtools::install_github("kbenoit/quanteda.dictionaries")
+
+library("quanteda.dictionaries")
+dict_liwc_french <- dictionary(file = "FrenchLIWCDictionary.dic",
+                             format = "LIWC")
+test<-liwcalike(df$text,dictionary = dict_liwc_french)
+kable(head(test,5))
+
+df<-cbind(df,test)
+
+write_rds(df,"df_nrcliwc.rds")
+
+```
+
+
+
+# Segmenter le corpus selon l'activité des twittos originaux
+
+Ultérieurement, il sera intéressant de comparer les deux sous corpus. Le premier reflète la production primaire et originale, de ceux assez engagés pour faire l'effort de produire un contenu. Le second reflète la propagation des idées diffusées dans par le premier et les préférences des utilisateurs moins engagés, les "transmetteurs". Ils ont le pouvoir de propager certains contenus audelà de leurs audiences immédiates et peuvent ainsi déformer la distribution des contenus, comme l'écho peut filtrer certains sons.
+
+
+```{r prod}
+
+#on calcule le nombre de tweets par twittos
+twittos<-df %>% 
+  mutate(n=1) %>% 
+  group_by(screen_name) %>% 
+  summarise(nb_tweetso = sum(n))
+mean<-round(mean(twittos$nb_tweetso),1)
+median<-median(twittos$nb_tweetso)
+max<- max(twittos$nb_tweetso)
+
+g01<-ggplot(twittos, aes(x=nb_tweetso))+
+  geom_histogram(binwidth=1,fill="royalblue1")+
+  theme_minimal()+
+  xlim(0,150)+
+  labs(x = "Nombre de tweets par twittos",y = "Fréquence",
+         title = "Distribution des posts (tweet,reply, quote)", 
+       subtitle =paste0("nombre max=",max, " - médiane = ", median))+
+  scale_y_log10(labels = comma)
+
+#on analyse la concentration
+#library(ineq)
+#library(gglorenz)
+gini<-round(ineq(twittos$nb_tweetso,type = c("Gini")),3)
+
+gini
+g02<-twittos %>%
+    ggplot(aes(nb_tweetso)) +
+    stat_lorenz(desc = TRUE,size=1.2,color="royalblue4") +
+    coord_fixed() +
+    geom_abline(linetype = "dashed") +
+    theme_minimal() +labs(x = "Proportion cumulée des twittos",
+         y = "Proportion cumulée des posts",
+         title = "Concentration des posts ",subtitle =paste0("indice de Gini=",gini),
+         caption = "data : Banda et al (2020)")
+
+grid.arrange(g01,g02,ncol=2)
+```
+
+[retour au repo](https://github.com/BenaventC/BarometreConfinement)
